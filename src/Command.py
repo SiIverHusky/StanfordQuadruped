@@ -14,6 +14,11 @@ class Command:
         self.yaw = 0.0
         self.activation = 0
         self.legslocation = [[0.06,0.06,-0.06,-0.06],[-0.05,0.05,-0.05,0.05],[-0.07,-0.07,-0.07,-0.07]]
+        
+        # Mask for legs that should NOT rotate with body attitude (stay static in body frame)
+        # Format: [leg0_static, leg1_static, leg2_static, leg3_static]
+        # 0 = leg rotates with body (normal), 1 = leg stays static (bypasses rotation)
+        self.static_legs_mask = [0, 0, 0, 0]
 
         self.hop_event = False
         self.trot_event = False
@@ -22,3 +27,4 @@ class Command:
         # Fales: dance triggered by controller
         # True: dance triggered by command line
         self.pseudo_dance_event = False
+

@@ -180,15 +180,31 @@ class Controller:
                 else:
                     state.foot_locations,contact_modes = self.step_gait(state,command)
 
-                rotated_foot_locations = (
-                    euler2mat(
-                        command.roll/57.3,
-                        command.pitch/57.3,
-                        #self.smoothed_yaw,
-                        command.yaw/57.3,
-                    )
-                    @ state.foot_locations
+                # Build rotation matrix for body attitude
+                rotation_matrix = euler2mat(
+                    command.roll/57.3,
+                    command.pitch/57.3,
+                    command.yaw/57.3,
                 )
+                
+                # Check if we have a static legs mask
+                static_mask = getattr(command, 'static_legs_mask', [0, 0, 0, 0])
+                has_static_legs = any(m == 1 for m in static_mask)
+                
+                if has_static_legs:
+                    # Apply rotation selectively: static legs stay in place, others rotate
+                    rotated_foot_locations = np.zeros_like(state.foot_locations)
+                    for leg_idx in range(4):
+                        leg_pos = state.foot_locations[:, leg_idx]
+                        if static_mask[leg_idx] == 1:
+                            # Static leg: keep original position (no rotation)
+                            rotated_foot_locations[:, leg_idx] = leg_pos
+                        else:
+                            # Normal leg: apply body rotation
+                            rotated_foot_locations[:, leg_idx] = rotation_matrix @ leg_pos
+                else:
+                    # No static legs: apply rotation to all (original behavior)
+                    rotated_foot_locations = rotation_matrix @ state.foot_locations
 
             
  # Construct foot rotation matrix to compensate for body tilt

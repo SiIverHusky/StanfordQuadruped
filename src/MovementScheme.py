@@ -213,6 +213,26 @@ class Movements:
         self.TurnOutput = [0,0,0]         # yaw rate
         self.LegsLocationOutput = [[0,0,0,0],[0,0,0,0],[0,0,0,0]] # x,y,z for 4 legs
         
+        # Static legs mask: legs marked as 1 will NOT rotate with body attitude
+        # Format: [leg0, leg1, leg2, leg3] where 0=rotate normally, 1=stay static
+        self.StaticLegsMask = [0, 0, 0, 0]
+        
+    def setStaticLegsMask(self, mask):
+        """Set which legs should remain static (not rotate with body attitude).
+        
+        Args:
+            mask: List of 4 values [leg0, leg1, leg2, leg3]
+                  0 = leg rotates with body attitude (normal behavior)
+                  1 = leg stays static in body frame (bypasses rotation)
+        """
+        if len(mask) == 4:
+            self.StaticLegsMask = list(mask)
+        return True
+    
+    def getStaticLegsMask(self):
+        """Get the current static legs mask."""
+        return self.StaticLegsMask
+
     def setTransitionTic(self, tic):
         """ determin how many time steps it takes from current movement to the next one"""
         self.transTic = tic
@@ -823,6 +843,18 @@ class MovementScheme:
         """get now legs_location
         """
         return self.legs_location_now 
+    
+    def getStaticLegsMask(self):
+        """Get the static legs mask from the current movement.
+        
+        Returns:
+            List of 4 values [leg0, leg1, leg2, leg3]
+            0 = leg rotates with body attitude (normal)
+            1 = leg stays static in body frame (bypasses rotation)
+        """
+        if hasattr(self.movements_now, 'StaticLegsMask'):
+            return self.movements_now.StaticLegsMask
+        return [0, 0, 0, 0]
 
     def getMovemenAttitude(self):
         """get now attitude

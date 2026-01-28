@@ -378,6 +378,91 @@ class MovementGroups:
         self.MovementLib.append(dance_scheme)      # append dance
         return self.MovementLib
 
+    def balance_diagonal(self, roll_deg, pitch_deg, diagonal='FR_BL', lift_height=0.03, time_uni=0.015, time_acc=0):
+        """Balance on two diagonal legs while lifting the other two.
+        
+        The robot lifts one diagonal pair of legs to a FIXED position relative to the body frame
+        (they do NOT rotate with body attitude changes). The other two legs remain on the ground
+        and rotate with body attitude to achieve balance correction.
+        
+        This uses the static_legs_mask feature in MovementScheme/Controller to bypass body
+        rotation for the lifted legs.
+        
+        Args:
+            roll_deg: the desired roll angle for balance correction (degrees)
+            pitch_deg: the desired pitch angle for balance correction (degrees)
+            diagonal: which diagonal pair to LIFT
+                     'FR_BL' = lift Front-Right + Back-Left (balance on Front-Left + Back-Right)
+                     'FL_BR' = lift Front-Left + Back-Right (balance on Front-Right + Back-Left)
+            lift_height: height to lift the diagonal legs (meters), default 0.03m
+            time_uni: how long to hold the pose (unit: second)
+            time_acc: how long to reach the pose (unit: second)
+        
+        Return:
+            Append the diagonal balance movement into the MovementLib
+            
+        Leg indices:
+            Leg 0: Front-Right [0.06, -0.05, -0.07]
+            Leg 1: Front-Left  [0.06,  0.05, -0.07]
+            Leg 2: Back-Right  [-0.06, -0.05, -0.07]
+            Leg 3: Back-Left   [-0.06,  0.05, -0.07]
+        """
+        if time_uni <= 0:
+            time_uni = self.dt
+        if time_acc <= 0:
+            time_acc = self.dt
+            
+        interval_uni = int(time_uni / self.dt)
+        interval_acc = int(time_acc / self.dt)
+        
+        # Cap the angles for safety
+        modified_roll = self.cap_limit(self.rowcap, -self.rowcap, roll_deg)
+        modified_pitch = self.cap_limit(self.pitchcap, -self.pitchcap, pitch_deg)
+        
+        # Cap the lift height for safety
+        modified_lift = self.cap_limit(self.legliftcap, 0, lift_height)
+        
+        # Default standing z position
+        z_ground = -0.07
+        z_lifted = z_ground + modified_lift  # Lifted position (closer to body)
+        
+        dance_scheme = Movements('balance_diagonal')
+        
+        # Define leg positions
+        # Leg 0: Front-Right, Leg 1: Front-Left, Leg 2: Back-Right, Leg 3: Back-Left
+        if diagonal == 'FR_BL':
+            # Lift Front-Right (leg 0) and Back-Left (leg 3)
+            # Balance on Front-Left (leg 1) and Back-Right (leg 2)
+            dance_all_legs = [
+                [[ 0.06, -0.05, z_lifted]],  # Leg 0: Front-Right - LIFTED (static)
+                [[ 0.06,  0.05, z_ground]],  # Leg 1: Front-Left  - on ground (rotates)
+                [[-0.06, -0.05, z_ground]],  # Leg 2: Back-Right  - on ground (rotates)
+                [[-0.06,  0.05, z_lifted]],  # Leg 3: Back-Left   - LIFTED (static)
+            ]
+            # Mark lifted legs as static (won't rotate with body attitude)
+            static_mask = [1, 0, 0, 1]  # FR and BL are static
+        else:  # 'FL_BR'
+            # Lift Front-Left (leg 1) and Back-Right (leg 2)
+            # Balance on Front-Right (leg 0) and Back-Left (leg 3)
+            dance_all_legs = [
+                [[ 0.06, -0.05, z_ground]],  # Leg 0: Front-Right - on ground (rotates)
+                [[ 0.06,  0.05, z_lifted]],  # Leg 1: Front-Left  - LIFTED (static)
+                [[-0.06, -0.05, z_lifted]],  # Leg 2: Back-Right  - LIFTED (static)
+                [[-0.06,  0.05, z_ground]],  # Leg 3: Back-Left   - on ground (rotates)
+            ]
+            # Mark lifted legs as static (won't rotate with body attitude)
+            static_mask = [0, 1, 1, 0]  # FL and BR are static
+        
+        dance_speed = [[0, 0, 0]]  # No movement speed
+        dance_attitude = [[modified_roll, modified_pitch, 0], [modified_roll, modified_pitch, 0]]
+        
+        dance_scheme.setInterpolationNumber(interval_uni)
+        dance_scheme.setTransitionTic(interval_acc)
+        dance_scheme.setLegsSequence(dance_all_legs)
+        dance_scheme.setAttitudeSequence(dance_attitude)
+        dance_scheme.setStaticLegsMask(static_mask)  # Set which legs bypass rotation
+        self.MovementLib.append(dance_scheme)
+        return self.MovementLib
 
 
     
